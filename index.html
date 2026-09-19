@@ -107,6 +107,8 @@ const STATUS_COL=3;
 const STANDARD_STATUSES=['ACTIF','A REINITIALISER','A CRÉER','A SUPPRIMER','INACTIF','NA'];
 const EDITABLE_STATUS_SHEETS=ACCESS_SHEETS.filter(s=>s!=='PLAY SMS');
 const serviceMap={'DCLM':'DCLM 209','ECW':'ECW 209','HXC':'HXC 209','IRM':'IRM 209','CEM':'CEM 209','OTD':'OTD 209','PLAY SMS':'PLAY SMS','MBM':'MBM','RAPPORT MOMO':'RAPPORT MOMO'};
+const EMAIL_MAP={"ABOU RACHAD":"aboudourachad940@gmail.com","ADANHOU LOUDYA":"adanhouloudya@gmail.com","ADANKANHOUN FERREOL ANOLD":"fadankanhoun@palladiumafrica.com","ADANVE TETE PRUDENCE":"padanve@groupmediacontact.com","ADEBINKPE ABDOUL MANDJID KOLAWOLE":"adebinkpemandjid@gmail.com","ADJIDJAN ISAAC":"adjidjanisaac12@gmail,com","ADOMOU GIRESSE":"giresseadomou1@gmail.com","ADOUNVO LEONCE LEONEL FINAGNON":"adounvoleonel@gmail.com","AGBANRIN SYLVIE":"agbanrinsylvie@gmail.com","AGBESSI GERRONETTE MERVEILLE":"agbessigerronnette@gmail.com","AHIGBE MARCELIN DIEU-DONNEE":"ahigbemarcellin@gmail.com","AHITCHEME CEDRIC":"elvisahitcheme@gmail.com","AHITCHEME YEDIA CAKPO RICO":"ahitchemerico39@gmail.com","AHOUANDE AYETO HERMANN":"hahouande@groupmediacontact.com","AHOUANSE FRANCK":"ahouanse99@gmail.com","AHOUANSOU SAMUEL":"samuelahouansou41@gmail.com","AHOUNOU ISLAMIATH KEMI":"islamiathkemi@gmail.com","AHOUNOU MATHIEU":"qualite@groupmediacontact.com","AKOMEDI DIEU-DONNE":"femioluwaa@gmail.com","AKOU CHADRAC":"constantakou@gmail.com","ALISSA BERNICE":"bernicealissa@gmail.com","ALOFA AMELIE":"alofaamelie@gmail.com","AMOUSSA SLAMIATH":"mondjisolaa@gmail.com","ARIGBO IMMACULEE":"immaculeearigbo7@gmail,com","ASSIMADA AURIOL":"assimadaauriol@gmail.com","ASSOGBA ODJOLA CARINE":"carineassogba70@gmail.com","ATADEDJI BASILE":"basileatadedji@gmail.com","AVAHOUNDJE EMAUS":"emausavahoundje21@gmail.com","AYEKO RUTH":"kadoupke99@gmail.com","AZANKPO SEVI PALESTINE":"seviazankpo@gmail.com","AZANTCHESSOU GLORIA":"azantchessgloria@gmail.com","BADEDJI DAGBEMAMBOU WILFRANDO":"wilbad89@gmail.com","BAMIDOURO PHARES LUTHER ADEYEMI":"bamidourolive@gmail.com","BATOSSI LEA":"lbatossi@groupmediacontact.com","BOCODJOUGBE JULES":"bocodjougbe0@gmail.com","BOSSA LAURENCE":"bossasandylaurence@gmail.com","BOYA CAIUS GEORGES":"boyageorges248@gmail.com","CHAFFA AMIRATH":"chaffafac@gmail.com","CODJO TADAGBE FABRICE SALOMON":"fabricecodjo951@gmail.com","D’ALMEIDA JUVENCIO":"ajuvencio6@gmail.com","DADY SENA LAURE":"dadyslaure@gmail.com","DAGAN IDELPHONSE":"daganbabatounde@gmail.com","DAGNONHOUETON MAHOUTIN JOLIVETTE ANGELA":"dagnonhouetonjolivette@gmail.com","DEFLY NATACHA AFIAVI S.":"ndefly@groupmediacontact.com","DJAKPO SERGINE":"serginedjakpo@gmail.com","DJIDOKPA NADEGE":"ndjidokpa@gmail.com","DOHETO NOELIE":"noeliedoheto@gmail.com","DOSSOU CHRISTOPHE":"christophedos059@gmail.com","DOSSOU ORTHANCE ROMAINE":"romainedossou6@gmail.com","DOSSOU-YOVO MAHUGNON EPHRAIM":"Ephaimkurt@gmail.com","EBODA SIKIROU WADJOULD":"wadjouldeboda@gmail.com","EKOUEDJEN PERPETUE":"labiteakossiwa@gmail.com","FADAIRO DIANE":"fadairodiane@gmail.com","FAGNON MISSIMAHOU CAROLE":"fagnon.m.carole@gmail.com","FASSINOU MAHOUNA GILDAS":"gilfassinou@gmail.com","FONGNI JEOVINCE":"jeofongni@gmail.com","FOSSOUKPO HOUESSOU CONSTANCE":"houessouconstance7@gmail.com","GAFAROU GUYAS":"gafarouguyas@gmail.com","GANSOU ECTOR":"hgansou303@gmail.com","GBADESSI TRINITE":"tritherich@gmail.com","GBEGONNOUDE SERVANE VILMARD":"gbegonnoudeservane@gmail.com","GODONOU MARY SERGIA":"godonoumary17@gmail.com","GOTOESSI BAKIATH OMONIKE JOANITA":"joanitagotoessi@gmail.com","GUELLY ANGELO":"aguelly07@gmail.com","HESSOU ROMULUS RODRIGO -TRESOR":"romulushessou@gmail.com","HODONOU JOSEPH":"josephomerhodonou@gmail.com","HOMEGNON BIENVENU":"bhomegnon@groupmediacontact.com","HOUEDEGNON OLGA REBECCA":"ohouedegnon@groupmediacontact.com","HOUEDETE IMMACULEE":"immahouedete30@gmail.com","HOUESSIONON EXPEDIT":"expedithouessionon@gmail.com","HOUESSOU CHIMENE NADEGE KEMY":"kemyhouessou1@gmail.com","HOUNGA DENAKPO THIERRY":"thounga@groupmediacontact.com","HOUNGBEDE SENAN MARIUS":"agassoulm9@gmail.com","HOUNGNIBO VADIM":"vhoungnibo@gmail.com","HOUNGNON INECK":"ineckolivevehoungnon@gmail.com","HOUNKPATIN SEMEVO BRUXE":"Semevobruxehounkpatin1@gmail.com","HOUNKPONOU AURIOL":"auriolhounkponou1@gmail.com","HOUNSOU DORIS":"gbaguididoris6@gmail.com","HOUNTOHOTEGBE PIERRE":"pierrehountohotegbe621@gmail.com","KINKIN DAVID":"davidkinkin5@gmail.com","KITI HEMIANON FREJUS":"hemianonfrejuskiti@gmail.com","KODJOGBE AURELIEN":"Angeskodj12@gmail.com","KOKOROKO ALPHONSE":"alphonsedodji16@gmail.com","KPADA JAMES EULOGE":"jameskpda@gmail.com","KPENOU MARLENE CREDO":"mkpenou@groupmediacontact.com","LOKOSSOU KELIN, G, KASEL":"klokossou@groupmediacontact.com","MAMA FIRDAOUS":"firdaousmama9@gmail.com","MAMADOU FERDINAND":"mamadouferdinard91@gmail.com","MONSI-AGBOKA JEAN-EUDES":"jeaneudesmonsiagboka@gmail,com","N'SOYENOU PRISCA":"nsoyenou92@gmail.com","NANNOUKON VIVIANE":"nannoukonviviane@gmail.com","NASSARA MARIANIQUE":"marianiquenassara@gmail.com","NOUGLOI HYACINTHE":"nougloih@gmail.com","SABI SIAKO MOUBARAK":"moubaraksabisiako@gmail.com","SAIZONOU ELODIANE":"yanelsaizonou@gmail.com","SOADE SOLANGE":"solangesoade@gmail.com","SOGBE CHRISTOPHE":"chrissogbe894@gmail.com","SOMAGNAN VIVIANE":"qualite@groupmediacontact.com","SOSSA NARCISSE":"sossanarcisse84@gmail.com","SOTON BERYL ARIEL J":"sotonberylk@gmail,com","TCHOKPON KOBAYE HORTENSE":"benediction594@gmail.com","TCHOUDJI SIMON":"tchoudjisimon@gmail.com","TOFFA LUMIERE":"Lumieretoffa@gmail.com","TOGNINOU MALIA IDA":"itogninou@gmail.com","TOSSA SEBASTIEN":"stossa229@gmail.com","TOSSIN ORPHET MOISE":"moisetossin@gmail.com","TOSSOU TANGUY FELIX ORNIDE MAHUTO":"ornide7@gmail.com","TOTCHEME SEGNONNA OMAR M":"totchemeomar1990@gmail.com","TOUDONOU AYMAR":"aymartoudonou66@gmail.com","ZOHOU HYACINTHE":"hyacinthezohou@gmail.com","ZOHOUN MARTHE":"marthezohoun719@gmail.com","ADEOTI HADIYYAH":"hadiyyahadeoti@gmail.com","ADJIHA CHARBEL":"amoscharbel26@gmail.com","AHOUANSE FIDEL":"fidel.ahouanse@gmail.com","AHOUANSOU REBECCA":"senamiahouans@gmail.com","ASSOGBA IDJIWA ALFRED":"alfredassogba97@gmail.com","ATINDOGBE ROSELLE":"atindogberoselle@gmail.com","ATOHOUNTOUN URIELLE":"urielleatohountoun1234@gmail.com","AWANSOU LUDJER":"ludgerawansou72@gmail.com","AWASSI EMERAUD":"emeraudjosuea@gmail.com","AYITIN AURORE ELVIRE":"ayitinelvir@gmail.com","AZANDEGBE VENANCE":"azandegbev007@gmail.com","BADOU ALEXANDRE ENORK":"badoualexandreenork221998@gmail.com","BOKO NANCY-LEE GLORIA":"boko20gloria@gmail.com","BORO N’GOYE BABAKAR SUDIRK SENGHOR":"senghorborongoye@gmail.com","D'OLIVEIRA ANABELLE":"rch9680@gmail.com","DAGAN ARNOLD":"arnolddagan5@gmail.com","DIOGO CHARLES":"charlesdiogo66@gmail.com","DOKO OCEANE":"dokoceane99@gmail.com","DOSSOU KAO RENAUDE MAWUNA":"renaudedossoukao@gmail.com","DOVONOU FREIDA":"nessamdk@gmail.com","EGNONNISSE ELOGE":"elogegnonnis@gmail.com","FADEKON KEKELI GLORIA":"fadekongloria342@gmail.com","FAVI VINCENT":"favivincent1@gmail.com","GBETO PELAGIE":"pelagie.gbeto6@gmail.com","GBEYI DANIEL":"danielgbeyi1@gmail.com","GBOLOU FILIBERT":"kelfidu229@gmail.com","GNANCADJA SIDOINE ASSIBA":"Sidoinegnancadja@gmail.com","HOUNGBEDJI HONORAT DEODAT":"Vidok.houngbeji@yahoo.fr","HOUNGBEDJI NADIATH":"nadiathhoungbedji0@gmail.com","HOUNHOUI LOUIS":"emrislouis@gmail.com","HOUNNOUVI AUGUSTIN":"chounnouvi@gmail.com","HOUNSOU ELLA":"ellechou9@gmail.com","HOUNVIO CHARBEL":"hounviocharbel98@gmail.com","HOUNWANOU EVEYNE":"evelynehounwanou@gmail.com","HOUNZINME MIREILLE":"hounzinmemireille@gmail.com","KAKPOSSA MAUREL":"kakpossamaurel5@gmail.com","KASSIWIN EMMANUEL":"kassiwinemmanuel@gmail.com","KITI LIONEL":"lionelkiti77@gmail.com","KOUNLE ADEWOUMI EMMA FOLAYIMIKA":"emmakounle@gmail.com","KPOFFON JOEL":"kpoffonjoel@gmail.com","LAEBLE AUGUSTINE":"augustinelaeble@gmail.com","LOITCHA SYLVESTRE":"Loitcha@123456789","LOKOSSOU ARMEL":"armeleur256@gmail.com","MOUMOUNI NASSIROU ANASSA":"anassamoumouni@outlook.fr","NOUKOUHOUI ESPERANDIEU FIACRE":"fnoukouhoui@gmail.com","NOUROU ABDOUL KOUDOUS":"koudous008@gmail.com","OKE-VE HILLARY STELLA":"sokeve76@gmail.com","RADJI ZIHADATH ADENIKE":"adenikeradji6@gmail.com","SEWADE SAMUEL":"samuelswd@outlook.fr","SOSSOU KOFFI RUBEN":"rubensossou19@gmail.com","SOVIGUIDI ORSLAINE":"soviguidiorslaine@gmail.com","TCHEGNON SIDOINE":"sidoine734@gmail.com","TOSSOUKPASSA LADIAS":"ladiastk@gmail.com","TOSSOUVES CAREINE":"careinetossouves@gmail.com","WEKE PATERSON":"patersonweke1@gmail.com","YOCLOUNON NICARETTE":"yoclounonnicarette@gmail.com","ZAMBA GRACIAS MAUVIELLE":"zambagratias@gmail.com","ZOHOUN AMEN":"marthezohoun719@gmail.com","YEBA JERRY ROTHSTEIN ADJEODA":"jerryyeba3@gmail.com","ZANKPE SABIN OSWALDE ABOUA":"zankpesabin@gmail.com"};
+let recapEmailOverrides={};
 function login(){if(document.getElementById('user').value==='Acces'&&document.getElementById('pass').value==='Designpress22.'){document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden');sessionStorage.setItem('accessHubAuth','1')}else document.getElementById('loginError').textContent='Identifiant ou mot de passe incorrect.'}
 function logout(){sessionStorage.removeItem('accessHubAuth');location.reload()}
 if(sessionStorage.getItem('accessHubAuth')==='1'){document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden')}
@@ -114,7 +116,7 @@ function sheetNames(){return Object.keys(data)}
 function cleanRows(rows){return rows.filter(r=>r.some(v=>String(v??'').trim()!=='')).map(r=>r.map(v=>v??''))}
 function rowsFor(n){return n==='__ALL__'?Object.values(data).flatMap(r=>r):data[n]||[]}
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-function normalize(s){return String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim()}
+function normalize(s){return String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim().replace(/\s+/g,' ')}
 function headerIndex(h,patterns){return h.findIndex(x=>patterns.some(p=>p.test(normalize(x))))}
 function hasAccess(r,access){return r.some(v=>normalize(v).includes(normalize(access)))}
 function isActive(r){return normalize(r[STATUS_COL])==='ACTIF'}
@@ -139,7 +141,11 @@ function getHeaderAndRows(n){
         if(!item[3] && telVal)item[3]=telVal;
       });
     });
-    return {h:['NOM & PRENOMS','SEGMENT','NUMERO'],body:[...map.values()].map(r=>[r[0],r[2],r[3]])};
+    return {h:['NOM & PRENOMS','SEGMENT','NUMERO','ADRESSE MAIL'],body:[...map.values()].map(r=>{
+      const key=normalize(r[0]);
+      const mail=recapEmailOverrides[key]!==undefined?recapEmailOverrides[key]:(EMAIL_MAP[key]||'');
+      return [r[0],r[2],r[3],mail];
+    })};
   }
   const raw=cleanRows(rowsFor(n));
   if(!raw.length)return {h:DISPLAY_HEADERS,body:[]};
@@ -190,6 +196,7 @@ function updateRowField(name,tel,colIndex,newValue){
  if(!target)return;
  target[colIndex]=newValue;
 }
+function updateRecapEmail(name,value){recapEmailOverrides[normalize(name)]=value}
 function telCol(sheet){const hr=(data[sheet]||[]).find(r=>r.some(v=>normalize(v).includes('NOM & PRENOMS')||normalize(v)==='USERS'));const i=hr?hr.findIndex(v=>normalize(v).includes('TELEPHONE')):-1;return i<0?4:i}
 function updateRowStatus(name,oldState,tel,newState){
  const rows=data[currentSheet];if(!rows)return;
@@ -205,6 +212,7 @@ function renderTable(){
  if(!body.length){document.getElementById('tableBox').innerHTML='<div class="notice">Aucune donnée ne correspond aux filtres sélectionnés.</div>';return}
  const editable=EDITABLE_STATUS_SHEETS.includes(currentSheet);
  const textEditable=ACCESS_SHEETS.includes(currentSheet);
+ const recapEditable=currentSheet==='RECAP';
  const telIdx=h.findIndex(x=>normalize(x).includes('TELEPHONE'));
  document.getElementById('tableBox').innerHTML=`<div class="table-wrap"><table><thead><tr>${h.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${body.map(r=>'<tr>'+h.map((head,i)=>{
    let v=String(r[i]??'');
@@ -217,6 +225,10 @@ function renderTable(){
      const name=String(r[0]??'').trim(),tel=String(r[telIdx]??'').trim();
      return `<td><input type="text" class="editField${v===''?' empty':''}" data-col="${i}" data-name="${esc(name)}" data-tel="${esc(tel)}" value="${esc(v)}" placeholder="— à renseigner —"></td>`;
    }
+   if(recapEditable&&normalize(head)==='ADRESSE MAIL'){
+     const name=String(r[1]??'').trim();
+     return `<td><input type="text" class="editField${v===''?' empty':''}" data-recap-name="${esc(name)}" value="${esc(v)}" placeholder="— à renseigner —"></td>`;
+   }
    return `<td>${/actif|réinitial|reinitial|a créer|à créer|^na$/i.test(v)?`<span class="badge ${statusClass(v)}">${esc(v)}</span>`:esc(v)}</td>`;
  }).join('')+'</tr>').join('')}</tbody></table></div>`;
  if(editable)document.querySelectorAll('.statusSelect').forEach(sel=>{sel.addEventListener('change',()=>{
@@ -224,11 +236,18 @@ function renderTable(){
    if(val==='__AUTRE__'){const custom=prompt('Saisir un état personnalisé :','');if(custom===null||custom.trim()===''){sel.value=sel.dataset.old;return}val=custom.trim()}
    updateRowStatus(sel.dataset.name,sel.dataset.old,sel.dataset.tel,val);
  })});
- if(textEditable)document.querySelectorAll('.editField').forEach(inp=>{
+ if(textEditable)document.querySelectorAll('.editField[data-col]').forEach(inp=>{
    inp.addEventListener('change',()=>{
      updateRowField(inp.dataset.name,inp.dataset.tel,+inp.dataset.col,inp.value.trim());
      inp.classList.toggle('empty',inp.value.trim()==='');
      updateDashboard();
+     showToast('Modification enregistrée ✓');
+   });
+ });
+ if(recapEditable)document.querySelectorAll('.editField[data-recap-name]').forEach(inp=>{
+   inp.addEventListener('change',()=>{
+     updateRecapEmail(inp.dataset.recapName,inp.value.trim());
+     inp.classList.toggle('empty',inp.value.trim()==='');
      showToast('Modification enregistrée ✓');
    });
  });
