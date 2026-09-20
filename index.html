@@ -89,6 +89,7 @@ nav button{transition:background .15s ease,padding-left .15s ease,border-left-co
 .nav-toggle.collapsed .nav-toggle-current{display:block}
 nav#sheetNav{margin-top:8px}
 nav#sheetNav.collapsed{display:none}
+body.readonly .side-bottom .btn.gold,body.readonly button[onclick^="export"],body.readonly button[onclick^="resetLocalChanges"],body.readonly .track-form,body.readonly #trackModal .modal-body>.actions,body.readonly .track-entry-head button{display:none!important}
 </style>
 </head>
 <body>
@@ -193,12 +194,16 @@ const SUPABASE_KEY='sb_publishable_pS35yFyvgtS0dlT74veZcw_f4SdNG5C';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:window.sessionStorage,persistSession:true,autoRefreshToken:true}});
 const TABLE='app_state';
 let fieldEdits={};
+let READ_ONLY=false; /* compte « lecture » : consultation seule (l'écriture est aussi refusée côté serveur) */
+function applyRole(user){READ_ONLY=!!(user&&user.app_metadata&&user.app_metadata.role==='lecture');document.body.classList.toggle('readonly',READ_ONLY)}
 let pendingSaves=new Map(),saveTimer=null,saveInFlight=false,retryTimer=null;
 function setSyncState(s){
  const el=document.getElementById('syncStatus');if(!el)return;
+ if(READ_ONLY&&s!=='error'&&s!=='loading'){el.textContent='👁 Mode consultation (lecture seule)';return}
  el.textContent=({loading:'☁ Chargement…',pending:'☁ Enregistrement…',ok:'☁ Enregistré en ligne ✓',error:'⚠ Non enregistré — nouvel essai…'})[s]||'';
 }
 function queueSave(key,value){
+ if(READ_ONLY)return;
  pendingSaves.set(key,value);setSyncState('pending');
  clearTimeout(saveTimer);saveTimer=setTimeout(flushSaves,400);
 }
@@ -223,6 +228,23 @@ async function flushSaves(){
 }
 window.addEventListener('beforeunload',e=>{if(pendingSaves.size||saveInFlight){flushSaves();e.preventDefault();e.returnValue=''}});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSaves()});
+/* --- Mots de passe : jamais envoyés au compte « lecture » (copie masquée + clés « secret: » réservées aux éditeurs) --- */
+function isPwHeader(v){const n=normalize(v);return n.includes('MOT DE PASSE')||n.includes('PASSWORD')}
+function headerRowIndex(rows){const i=rows.findIndex(r=>r.some(v=>{const n=normalize(v);return n.includes('NOM & PRENOMS')||n.includes('NOM ET PRENOMS')||n==='USERS'}));return i<0?0:i}
+function pwCols(rows){if(!Array.isArray(rows)||!rows.length)return [];const hi=headerRowIndex(rows);return (rows[hi]||[]).map((v,i)=>isPwHeader(v)?i:-1).filter(i=>i>=0)}
+function maskData(d){
+ const out=JSON.parse(JSON.stringify(d));
+ Object.keys(out).forEach(sh=>{const rows=out[sh];if(!Array.isArray(rows))return;const hi=headerRowIndex(rows),cols=pwCols(rows);rows.forEach((r,ri)=>{if(ri===hi)return;cols.forEach(cc=>{if(cc<r.length)r[cc]=''})})});
+ return out;
+}
+function migrateSecrets(st){
+ if(READ_ONLY||!st.initialData||!Object.keys(st.initialData).length)return;
+ if(!st.hasView)queueSave('view:initial_data',maskData(st.initialData));
+ Object.keys(st.plainEditKeys).forEach(k=>{
+   const rec=st.fieldEdits[k];if(!rec)return;
+   if(pwCols(st.initialData[rec.sheet]).includes(rec.col)){queueSave('secret:edit:'+k,rec);queueSave('edit:'+k,null)}
+ });
+}
 async function loadPrefix(prefix){
  let out=[],start=0;const step=1000;
  for(;;){
@@ -235,11 +257,14 @@ async function loadPrefix(prefix){
  return out;
 }
 async function loadAll(){
- const b=await sb.from(TABLE).select('key,value').in('key',['base:initial_data','base:email_map']);
+ const baseKey=READ_ONLY?'view:initial_data':'base:initial_data';
+ const b=await sb.from(TABLE).select('key,value').in('key',[baseKey,'base:email_map']);
  if(b.error)throw b.error;
- const st={initialData:null,emailMap:null,fieldEdits:{},mail:{},track:{}};
- (b.data||[]).forEach(r=>{if(r.key==='base:initial_data')st.initialData=r.value;if(r.key==='base:email_map')st.emailMap=r.value});
- (await loadPrefix('edit:')).forEach(r=>{st.fieldEdits[r.key.slice(5)]=r.value});
+ const st={initialData:null,emailMap:null,hasView:true,fieldEdits:{},plainEditKeys:{},mail:{},track:{}};
+ (b.data||[]).forEach(r=>{if(r.key===baseKey)st.initialData=r.value;if(r.key==='base:email_map')st.emailMap=r.value});
+ if(!READ_ONLY){const v=await sb.from(TABLE).select('key').eq('key','view:initial_data');if(v.error)throw v.error;st.hasView=(v.data||[]).length>0}
+ (await loadPrefix('edit:')).forEach(r=>{const k=r.key.slice(5);st.fieldEdits[k]=r.value;st.plainEditKeys[k]=1});
+ if(!READ_ONLY)(await loadPrefix('secret:edit:')).forEach(r=>{st.fieldEdits[r.key.slice(12)]=r.value});
  (await loadPrefix('mail:')).forEach(r=>{st.mail[r.key.slice(5)]=r.value});
  (await loadPrefix('track:')).forEach(r=>{st.track[r.key.slice(6)]=r.value});
  return st;
@@ -248,7 +273,7 @@ function editKeyOf(sheet,name,tel,col){return sheet+'|'+normalize(name)+'|'+tel+
 function recordFieldEdit(sheet,name,tel,colIndex,value){
  const k=editKeyOf(sheet,name,tel,colIndex);
  const rec={sheet:sheet,name:name,tel:tel,col:colIndex,value:value};
- fieldEdits[k]=rec;queueSave('edit:'+k,rec);
+ fieldEdits[k]=rec;queueSave((pwCols(data[sheet]).includes(colIndex)?'secret:edit:':'edit:')+k,rec);
 }
 function persistState(){} /* conservé pour compatibilité : l'enregistrement se fait désormais au fil de l'eau */
 function applyFieldEdits(){
@@ -285,6 +310,7 @@ async function bootApp(keepSheet){
  setSyncState('loading');
  try{
    const st=await loadAll();
+   migrateSecrets(st);
    initialData=st.initialData||{};EMAIL_MAP=st.emailMap||{};
    fieldEdits=st.fieldEdits;recapEmailOverrides=st.mail;trackData=st.track;
    data=JSON.parse(JSON.stringify(initialData));
@@ -292,7 +318,7 @@ async function bootApp(keepSheet){
    const empty=!Object.keys(data).length;
    setupNav();updateDashboard();
    selectSheet(keepSheet&&data[keepSheet]?keepSheet:'__ALL__');
-   document.getElementById('fileStatus').textContent=empty?'Aucune donnée en ligne : lancez l\'outil d\'import ou importez un Excel.':'Données chargées depuis l\'enregistrement en ligne.';
+   document.getElementById('fileStatus').textContent=empty?(READ_ONLY?'Données de consultation pas encore prêtes : le compte éditeur doit se connecter une fois.':'Aucune donnée en ligne : lancez l\'outil d\'import ou importez un Excel.'):'Données chargées depuis l\'enregistrement en ligne.';
    setSyncState('ok');
    return true;
  }catch(err){
@@ -312,6 +338,7 @@ async function login(){
  btn.disabled=false;btn.textContent='Se connecter';
  if(res.error){err.textContent=/network|fetch/i.test(res.error.message||'')?'Connexion impossible : vérifiez votre réseau.':'E-mail ou mot de passe incorrect.';return}
  document.getElementById('pass').value='';
+ applyRole(res.data&&res.data.user);
  showApp();await bootApp();
 }
 async function logout(){
@@ -329,7 +356,7 @@ async function initSession(){
  sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&!document.getElementById('app').classList.contains('hidden'))location.reload()});
  try{
    const r=await sb.auth.getSession();
-   if(r.data&&r.data.session){showApp();await bootApp()}
+   if(r.data&&r.data.session){applyRole(r.data.session.user);showApp();await bootApp()}
  }catch(e){console.warn('Session indisponible',e)}
 }
 
@@ -377,7 +404,9 @@ function getHeaderAndRows(n){
   if(!w)w=DISPLAY_COLS;
   const h=sourceHeader.slice(0,w).map((x,i)=>x||('Colonne '+(i+1)));
   const body=raw.slice(hi+1).filter(r=>String(r[0]??'').trim()!=='');
-  return {h,body:body.map(r=>{let out=r.slice(0,w);while(out.length<w)out.push('');return out;})};
+  const rowsOut=body.map(r=>{let out=r.slice(0,w);while(out.length<w)out.push('');return out;});
+  if(READ_ONLY){const keep=h.map((x,i)=>isPwHeader(x)?-1:i).filter(i=>i>=0);if(keep.length!==h.length)return {h:keep.map(i=>h[i]),body:rowsOut.map(r=>keep.map(i=>r[i]))}}
+  return {h,body:rowsOut};
 }
 const SHEET_ICONS={'RECAP':'👥','DCLM 209':'🗂️','ECW 209':'📶','HXC 209':'🧾','IRM 209':'📑','CEM 209':'🛠️','OTD 209':'📞','PLAY SMS':'💬','MBM':'🔐','RAPPORT MOMO':'💰'};
 function setupNav(){
@@ -451,7 +480,7 @@ function clearTrackForm(){
  document.getElementById('tf_other').value='';
 }
 function addTrackEntry(){
- if(!currentTrackKey)return;
+ if(!currentTrackKey||READ_ONLY)return;
  const entry={
    ts:Date.now(),
    infoDate:document.getElementById('tf_infoDate').value,
@@ -474,7 +503,7 @@ function addTrackEntry(){
  showToast('Entrée de suivi enregistrée ✓');
 }
 function deleteTrackEntry(idx){
- if(!currentTrackKey||!trackData[currentTrackKey])return;
+ if(READ_ONLY||!currentTrackKey||!trackData[currentTrackKey])return;
  if(!confirm('Supprimer cette entrée de l\'historique ?'))return;
  trackData[currentTrackKey].splice(idx,1);
  if(!trackData[currentTrackKey].length)delete trackData[currentTrackKey];
@@ -516,7 +545,7 @@ async function resetLocalChanges(){
  if(t===null||t.trim()!=='EFFACER')return;
  try{
    await flushSaves();
-   for(const p of ['edit:%','mail:%','track:%']){const r=await sb.from(TABLE).delete().like('key',p);if(r.error)throw r.error}
+   for(const p of ['edit:%','secret:edit:%','mail:%','track:%']){const r=await sb.from(TABLE).delete().like('key',p);if(r.error)throw r.error}
    fieldEdits={};recapEmailOverrides={};trackData={};
    data=JSON.parse(JSON.stringify(initialData));
    renderTable();updateDashboard();
@@ -539,9 +568,9 @@ function updateRowStatus(name,oldState,tel,newState){
 function renderTable(){
  let {h,body}=getFiltered();document.getElementById('rowCount').textContent=`${body.length} ligne(s)`;
  if(!body.length){document.getElementById('tableBox').innerHTML='<div class="notice">Aucune donnée ne correspond aux filtres sélectionnés.</div>';return}
- const editable=EDITABLE_STATUS_SHEETS.includes(currentSheet);
- const textEditable=ACCESS_SHEETS.includes(currentSheet);
- const recapEditable=currentSheet==='RECAP';
+ const editable=!READ_ONLY&&EDITABLE_STATUS_SHEETS.includes(currentSheet);
+ const textEditable=!READ_ONLY&&ACCESS_SHEETS.includes(currentSheet);
+ const recapEditable=!READ_ONLY&&currentSheet==='RECAP';
  let telIdx=h.findIndex(x=>normalize(x).includes('TELEPHONE'));
  if(telIdx<0)telIdx=h.findIndex(x=>normalize(x).includes('NUMERO'));
  const nameIdx=recapEditable?1:0;
@@ -595,9 +624,9 @@ function updateDashboard(){
  try{if(chart)chart.destroy();if(typeof Chart!=='undefined')chart=new Chart(document.getElementById('statusChart'),{type:'doughnut',data:{labels:Object.keys(counts),datasets:[{data:Object.values(counts)}]},options:{responsive:true,plugins:{legend:{position:'bottom'}}}});}catch(e){console.warn('Chart indisponible',e);}
  document.getElementById('coverageGrid').innerHTML=ACCESS_SHEETS.map(a=>{let sheet=serviceMap[a]||a;let rows=getHeaderAndRows(sheet).body;let act=rows.filter(isActive).length,p=rows.length?Math.round(act/rows.length*100):0;return `<div class="coverage-item"><div class="name">${esc(a.replace(' 209',''))}</div><div class="pct">${p}%</div><div class="small-note">${act} actif(s) / ${rows.length} ligne(s)</div><div class="mini"><i style="width:${p}%"></i></div></div>`}).join('');
 }
-async function exportCurrentExcel(){let {h,body}=getFiltered();if(!h.length)return;let ws=XLSX.utils.aoa_to_sheet([h,...body]),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,(currentSheet==='__ALL__'?'GLOBAL':currentSheet).slice(0,31));const filename=`ACCESS_HUB_${currentSheet==='__ALL__'?'GLOBAL':currentSheet}_${new Date().toISOString().slice(0,10)}.xlsx`;try{if(window.claude&&window.claude.use){const dl=await window.claude.use('downloads');if(dl){await dl.save({filename,data:XLSX.write(wb,{bookType:'xlsx',type:'array'})});return}}}catch(e){console.warn('Téléchargement indisponible',e)}XLSX.writeFile(wb,filename)}
-async function exportCurrentPDF(){let {h,body}=getFiltered();if(!h.length)return;const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});doc.setFontSize(16);doc.text('ACCESS HUB MCB',14,14);doc.setFontSize(10);doc.text(`Rapport : ${currentSheet==='__ALL__'?'GLOBAL':currentSheet}`,14,21);doc.text(`Généré le ${new Date().toLocaleString('fr-FR')}`,14,27);doc.autoTable({head:[h],body:body.map(r=>h.map((_,i)=>String(r[i]??''))),startY:32,styles:{fontSize:7,cellPadding:2},headStyles:{fillColor:[7,88,117]},didParseCell:function(d){if(d.section==='body'&&d.column.index===3)d.cell.styles.fontStyle='bold'}});const filename=`ACCESS_HUB_${currentSheet==='__ALL__'?'GLOBAL':currentSheet}_${new Date().toISOString().slice(0,10)}.pdf`;try{if(window.claude&&window.claude.use){const dl=await window.claude.use('downloads');if(dl){await dl.save({filename,data:doc.output('blob')});return}}}catch(e){console.warn('Téléchargement indisponible',e)}doc.save(filename)}
-async function exportAllSheets(){
+async function exportCurrentExcel(){if(READ_ONLY)return;let {h,body}=getFiltered();if(!h.length)return;let ws=XLSX.utils.aoa_to_sheet([h,...body]),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,(currentSheet==='__ALL__'?'GLOBAL':currentSheet).slice(0,31));const filename=`ACCESS_HUB_${currentSheet==='__ALL__'?'GLOBAL':currentSheet}_${new Date().toISOString().slice(0,10)}.xlsx`;try{if(window.claude&&window.claude.use){const dl=await window.claude.use('downloads');if(dl){await dl.save({filename,data:XLSX.write(wb,{bookType:'xlsx',type:'array'})});return}}}catch(e){console.warn('Téléchargement indisponible',e)}XLSX.writeFile(wb,filename)}
+async function exportCurrentPDF(){if(READ_ONLY)return;let {h,body}=getFiltered();if(!h.length)return;const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});doc.setFontSize(16);doc.text('ACCESS HUB MCB',14,14);doc.setFontSize(10);doc.text(`Rapport : ${currentSheet==='__ALL__'?'GLOBAL':currentSheet}`,14,21);doc.text(`Généré le ${new Date().toLocaleString('fr-FR')}`,14,27);doc.autoTable({head:[h],body:body.map(r=>h.map((_,i)=>String(r[i]??''))),startY:32,styles:{fontSize:7,cellPadding:2},headStyles:{fillColor:[7,88,117]},didParseCell:function(d){if(d.section==='body'&&d.column.index===3)d.cell.styles.fontStyle='bold'}});const filename=`ACCESS_HUB_${currentSheet==='__ALL__'?'GLOBAL':currentSheet}_${new Date().toISOString().slice(0,10)}.pdf`;try{if(window.claude&&window.claude.use){const dl=await window.claude.use('downloads');if(dl){await dl.save({filename,data:doc.output('blob')});return}}}catch(e){console.warn('Téléchargement indisponible',e)}doc.save(filename)}
+async function exportAllSheets(){if(READ_ONLY)return;
  const names=sheetNames();
  if(!names.length){showToast('Aucune donnée à exporter');return}
  const wb=XLSX.utils.book_new();
@@ -631,6 +660,7 @@ function importToCloud(){
    if(Object.keys(initialData).length)queueSave('backup:initial_data:'+new Date().toISOString(),initialData);
    initialData=JSON.parse(JSON.stringify(data));
    queueSave('base:initial_data',initialData);
+   queueSave('view:initial_data',maskData(initialData));
  }
  applyFieldEdits();
 }
