@@ -245,6 +245,56 @@ function migrateSecrets(st){
    if(pwCols(st.initialData[rec.sheet]).includes(rec.col)){queueSave('secret:edit:'+k,rec);queueSave('edit:'+k,null)}
  });
 }
+/* --- Mise à jour des données, appliquée UNE fois par le compte éditeur (après confirmation) ---
+   1) IRM 209 : la colonne « DATE (de départ au client) » devient « Mot de passe » (modifiable)
+   2) DCLM 209 : la colonne « Adresse mail » est remplie avec les e-mails de RECAP */
+const MIGRATION_KEY='meta:migration:2026-09-20-irm-mdp-dclm-mail';
+const MAIL_RE=/^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
+function cleanMail(v){return String(v??'').trim().replace(/\s+/g,'').replace(/,([A-Za-z]{2,})$/,'.$1')} /* « gmail,com » -> « gmail.com » */
+function buildDataMigration(st){
+ const base=JSON.parse(JSON.stringify(st.initialData));
+ const rep={irm:'feuille absente',filled:0,corrected:0,unmatched:[],invalid:[]};
+ const irm=base['IRM 209'];
+ if(Array.isArray(irm)&&irm.length){
+   const hi=headerRowIndex(irm),ci=(irm[hi]||[]).findIndex(v=>normalize(v)==='DATE (DE DEPART AU CLIENT)');
+   if(ci<0)rep.irm=(irm[hi]||[]).some(isPwHeader)?'déjà en place':'colonne introuvable';
+   else if(irm.some((r,i)=>i!==hi&&String(r[ci]??'').trim()!==''))rep.irm='non modifiée (la colonne contient déjà des dates)';
+   else{irm[hi][ci]='Mot de passe';rep.irm='ok'}
+ }
+ const dc=base['DCLM 209'];
+ if(Array.isArray(dc)&&dc.length){
+   const hi=headerRowIndex(dc),mc=(dc[hi]||[]).findIndex(v=>normalize(v)==='ADRESSE MAIL');
+   if(mc>=0)dc.forEach((r,ri)=>{
+     if(ri<=hi)return;
+     const name=String(r[0]??'').trim();if(!name)return;
+     const key=normalize(name);
+     const src=st.mail[key]!==undefined?st.mail[key]:(st.emailMap||{})[key];
+     const mail=cleanMail(src),cur=String(r[mc]??'').trim();
+     if(!mail){if(!cur)rep.unmatched.push(name);return}
+     if(!MAIL_RE.test(mail)){rep.invalid.push(name+' ('+mail+')');return}
+     if(mail===cur)return;
+     while(r.length<=mc)r.push('');
+     r[mc]=mail;if(cur)rep.corrected++;else rep.filled++;
+   });
+ }
+ return {base:base,rep:rep};
+}
+function runDataMigration(st){
+ st.migrationReport=null;
+ if(READ_ONLY||st.migrated||!st.initialData||!Object.keys(st.initialData).length)return;
+ const m=buildDataMigration(st),r=m.rep;
+ if(r.irm!=='ok'&&!r.filled&&!r.corrected)return;
+ if(!confirm('Mise à jour des données :\n\n• IRM 209 : « DATE (de départ au client) » devient « Mot de passe » (modifiable)\n• DCLM 209 : colonne « Adresse mail » remplie avec les e-mails de RECAP ('+r.filled+' à renseigner, '+r.corrected+' à corriger)\n\nL\'ancienne base est sauvegardée. Appliquer maintenant ?'))return;
+ const iso=new Date().toISOString();
+ queueSave('backup:initial_data:'+iso,st.initialData);
+ st.initialData=m.base;st.hasView=true;
+ queueSave('base:initial_data',m.base);
+ queueSave('view:initial_data',maskData(m.base));
+ queueSave(MIGRATION_KEY,{at:iso,irm:r.irm,filled:r.filled,corrected:r.corrected});
+ st.migrationReport='Mise à jour appliquée ✓\n\n• IRM 209 : colonne « Mot de passe » — '+r.irm+'\n• DCLM 209 : '+r.filled+' e-mail(s) renseigné(s), '+r.corrected+' corrigé(s)'
+   +(r.unmatched.length?'\n\nSans adresse dans RECAP (à compléter) — '+r.unmatched.length+' :\n'+r.unmatched.join('\n'):'')
+   +(r.invalid.length?'\n\nAdresse invalide, non copiée (à vérifier) :\n'+r.invalid.join('\n'):'');
+}
 async function loadPrefix(prefix){
  let out=[],start=0;const step=1000;
  for(;;){
@@ -260,9 +310,9 @@ async function loadAll(){
  const baseKey=READ_ONLY?'view:initial_data':'base:initial_data';
  const b=await sb.from(TABLE).select('key,value').in('key',[baseKey,'base:email_map']);
  if(b.error)throw b.error;
- const st={initialData:null,emailMap:null,hasView:true,fieldEdits:{},plainEditKeys:{},mail:{},track:{}};
+ const st={initialData:null,emailMap:null,hasView:true,migrated:true,fieldEdits:{},plainEditKeys:{},mail:{},track:{}};
  (b.data||[]).forEach(r=>{if(r.key===baseKey)st.initialData=r.value;if(r.key==='base:email_map')st.emailMap=r.value});
- if(!READ_ONLY){const v=await sb.from(TABLE).select('key').eq('key','view:initial_data');if(v.error)throw v.error;st.hasView=(v.data||[]).length>0}
+ if(!READ_ONLY){const v=await sb.from(TABLE).select('key').in('key',['view:initial_data',MIGRATION_KEY]);if(v.error)throw v.error;const ks=(v.data||[]).map(x=>x.key);st.hasView=ks.includes('view:initial_data');st.migrated=ks.includes(MIGRATION_KEY)}
  (await loadPrefix('edit:')).forEach(r=>{const k=r.key.slice(5);st.fieldEdits[k]=r.value;st.plainEditKeys[k]=1});
  if(!READ_ONLY)(await loadPrefix('secret:edit:')).forEach(r=>{st.fieldEdits[r.key.slice(12)]=r.value});
  (await loadPrefix('mail:')).forEach(r=>{st.mail[r.key.slice(5)]=r.value});
@@ -310,6 +360,7 @@ async function bootApp(keepSheet){
  setSyncState('loading');
  try{
    const st=await loadAll();
+   runDataMigration(st);
    migrateSecrets(st);
    initialData=st.initialData||{};EMAIL_MAP=st.emailMap||{};
    fieldEdits=st.fieldEdits;recapEmailOverrides=st.mail;trackData=st.track;
@@ -320,6 +371,7 @@ async function bootApp(keepSheet){
    selectSheet(keepSheet&&data[keepSheet]?keepSheet:'__ALL__');
    document.getElementById('fileStatus').textContent=empty?(READ_ONLY?'Données de consultation pas encore prêtes : le compte éditeur doit se connecter une fois.':'Aucune donnée en ligne : lancez l\'outil d\'import ou importez un Excel.'):'Données chargées depuis l\'enregistrement en ligne.';
    setSyncState('ok');
+   if(st.migrationReport)setTimeout(()=>alert(st.migrationReport),100);
    return true;
  }catch(err){
    console.error(err);setSyncState('error');
