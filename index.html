@@ -90,6 +90,7 @@ nav button{transition:background .15s ease,padding-left .15s ease,border-left-co
 nav#sheetNav{margin-top:8px}
 nav#sheetNav.collapsed{display:none}
 body.readonly .side-bottom .btn.gold,body.readonly button[onclick^="export"],body.readonly button[onclick^="resetLocalChanges"],body.readonly .track-form,body.readonly #trackModal .modal-body>.actions,body.readonly .track-entry-head button{display:none!important}
+.sv-row{cursor:pointer}.sv-row:hover td{background:#f1f8fb}.sv-notes{min-width:240px;max-width:380px;white-space:pre-wrap}
 </style>
 </head>
 <body>
@@ -354,6 +355,7 @@ function persistTrackData(){
  const k=currentTrackKey;if(!k)return;
  const arr=trackData[k];
  queueSave('track:'+k,(arr&&arr.length)?arr:null);
+ updateSuivisBadge();
 }
 function showApp(){document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden')}
 async function bootApp(keepSheet){
@@ -465,11 +467,12 @@ function setupNav(){
  const names=sheetNames();
  const recapBtn=names.includes('RECAP')?`<button data-sheet="RECAP">${SHEET_ICONS['RECAP']} RECAP</button>`:'';
  const apps=names.filter(n=>n!=='RECAP');
- nav.innerHTML='<button class="active" data-sheet="__ALL__">⌂ Tableau de bord</button>'+recapBtn+
+ const suivisBtn=`<button data-sheet="__SUIVIS__">📋 Tous les suivis (${allSuivis().length})</button>`;
+ nav.innerHTML='<button class="active" data-sheet="__ALL__">⌂ Tableau de bord</button>'+recapBtn+suivisBtn+
   (apps.length?'<div class="nav-section-title">Applications</div><div class="nav-apps">'+apps.map(n=>`<button data-sheet="${esc(n)}">${SHEET_ICONS[n]||'▫️'} ${esc(n)}</button>`).join('')+'</div>':'');
  nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{selectSheet(b.dataset.sheet);if(window.innerWidth<=650)setNavCollapsed(true)});
 }
-function selectSheet(n){currentSheet=n;updateNavCurrent(n);nav.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.sheet===n));document.getElementById('dashboard').classList.toggle('hidden',n!=='__ALL__');document.getElementById('tableSection').classList.toggle('hidden',n==='__ALL__');document.getElementById('pageTitle').textContent=n==='__ALL__'?'Tableau de bord':n;document.getElementById('pageSubtitle').textContent=n==='__ALL__'?'Vue globale des accès et de leur couverture.':`Consultation de « ${n} »`;document.getElementById('tableTitle').textContent=n==='__ALL__'?'Données globales':n;if(n!=='__ALL__'){buildFilters();renderTable()}}
+function selectSheet(n){currentSheet=n;updateNavCurrent(n);nav.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.sheet===n));document.getElementById('dashboard').classList.toggle('hidden',n!=='__ALL__');document.getElementById('tableSection').classList.toggle('hidden',n==='__ALL__');document.getElementById('pageTitle').textContent=n==='__ALL__'?'Tableau de bord':(n==='__SUIVIS__'?'Tous les suivis':n);document.getElementById('pageSubtitle').textContent=n==='__ALL__'?'Vue globale des accès et de leur couverture.':(n==='__SUIVIS__'?'Historique de tous les suivis enregistrés, sans ouvrir chaque fiche.':`Consultation de « ${n} »`);document.getElementById('tableTitle').textContent=n==='__ALL__'?'Données globales':(n==='__SUIVIS__'?'Tous les suivis':n);if(n==='__SUIVIS__'){renderSuivis()}else if(n!=='__ALL__'){buildFilters();renderTable()}}
 function getAccessValues(rows){let vals=[];rows.forEach(r=>r.forEach(v=>{let s=String(v??'').trim();if(s&&ACCESS_NAMES.some(a=>normalize(s).includes(normalize(a))))vals.push(s)}));return [...new Set(vals)].sort()}
 function buildFilters(){
  const {h,body}=getHeaderAndRows(currentSheet);
@@ -617,7 +620,7 @@ function updateRowStatus(name,oldState,tel,newState){
  persistState();
  renderTable();updateDashboard();
 }
-function renderTable(){
+function renderTable(){if(currentSheet==='__SUIVIS__'){renderSuivisTable();return}
  let {h,body}=getFiltered();document.getElementById('rowCount').textContent=`${body.length} ligne(s)`;
  if(!body.length){document.getElementById('tableBox').innerHTML='<div class="notice">Aucune donnée ne correspond aux filtres sélectionnés.</div>';return}
  const editable=!READ_ONLY&&EDITABLE_STATUS_SHEETS.includes(currentSheet);
@@ -676,8 +679,8 @@ function updateDashboard(){
  try{if(chart)chart.destroy();if(typeof Chart!=='undefined')chart=new Chart(document.getElementById('statusChart'),{type:'doughnut',data:{labels:Object.keys(counts),datasets:[{data:Object.values(counts)}]},options:{responsive:true,plugins:{legend:{position:'bottom'}}}});}catch(e){console.warn('Chart indisponible',e);}
  document.getElementById('coverageGrid').innerHTML=ACCESS_SHEETS.map(a=>{let sheet=serviceMap[a]||a;let rows=getHeaderAndRows(sheet).body;let act=rows.filter(isActive).length,p=rows.length?Math.round(act/rows.length*100):0;return `<div class="coverage-item"><div class="name">${esc(a.replace(' 209',''))}</div><div class="pct">${p}%</div><div class="small-note">${act} actif(s) / ${rows.length} ligne(s)</div><div class="mini"><i style="width:${p}%"></i></div></div>`}).join('');
 }
-async function exportCurrentExcel(){if(READ_ONLY)return;let {h,body}=getFiltered();if(!h.length)return;let ws=XLSX.utils.aoa_to_sheet([h,...body]),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,(currentSheet==='__ALL__'?'GLOBAL':currentSheet).slice(0,31));const filename=`ACCESS_HUB_${currentSheet==='__ALL__'?'GLOBAL':currentSheet}_${new Date().toISOString().slice(0,10)}.xlsx`;try{if(window.claude&&window.claude.use){const dl=await window.claude.use('downloads');if(dl){await dl.save({filename,data:XLSX.write(wb,{bookType:'xlsx',type:'array'})});return}}}catch(e){console.warn('Téléchargement indisponible',e)}XLSX.writeFile(wb,filename)}
-async function exportCurrentPDF(){if(READ_ONLY)return;let {h,body}=getFiltered();if(!h.length)return;const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});doc.setFontSize(16);doc.text('ACCESS HUB MCB',14,14);doc.setFontSize(10);doc.text(`Rapport : ${currentSheet==='__ALL__'?'GLOBAL':currentSheet}`,14,21);doc.text(`Généré le ${new Date().toLocaleString('fr-FR')}`,14,27);doc.autoTable({head:[h],body:body.map(r=>h.map((_,i)=>String(r[i]??''))),startY:32,styles:{fontSize:7,cellPadding:2},headStyles:{fillColor:[7,88,117]},didParseCell:function(d){if(d.section==='body'&&d.column.index===3)d.cell.styles.fontStyle='bold'}});const filename=`ACCESS_HUB_${currentSheet==='__ALL__'?'GLOBAL':currentSheet}_${new Date().toISOString().slice(0,10)}.pdf`;try{if(window.claude&&window.claude.use){const dl=await window.claude.use('downloads');if(dl){await dl.save({filename,data:doc.output('blob')});return}}}catch(e){console.warn('Téléchargement indisponible',e)}doc.save(filename)}
+async function exportCurrentExcel(){if(READ_ONLY)return;if(currentSheet==='__SUIVIS__')return exportSuivisExcel();let {h,body}=getFiltered();if(!h.length)return;let ws=XLSX.utils.aoa_to_sheet([h,...body]),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,(currentSheet==='__ALL__'?'GLOBAL':currentSheet).slice(0,31));const filename=`ACCESS_HUB_${currentSheet==='__ALL__'?'GLOBAL':currentSheet}_${new Date().toISOString().slice(0,10)}.xlsx`;try{if(window.claude&&window.claude.use){const dl=await window.claude.use('downloads');if(dl){await dl.save({filename,data:XLSX.write(wb,{bookType:'xlsx',type:'array'})});return}}}catch(e){console.warn('Téléchargement indisponible',e)}XLSX.writeFile(wb,filename)}
+async function exportCurrentPDF(){if(READ_ONLY)return;if(currentSheet==='__SUIVIS__'){showToast('Pour les suivis, utilisez l\'export Excel');return}let {h,body}=getFiltered();if(!h.length)return;const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});doc.setFontSize(16);doc.text('ACCESS HUB MCB',14,14);doc.setFontSize(10);doc.text(`Rapport : ${currentSheet==='__ALL__'?'GLOBAL':currentSheet}`,14,21);doc.text(`Généré le ${new Date().toLocaleString('fr-FR')}`,14,27);doc.autoTable({head:[h],body:body.map(r=>h.map((_,i)=>String(r[i]??''))),startY:32,styles:{fontSize:7,cellPadding:2},headStyles:{fillColor:[7,88,117]},didParseCell:function(d){if(d.section==='body'&&d.column.index===3)d.cell.styles.fontStyle='bold'}});const filename=`ACCESS_HUB_${currentSheet==='__ALL__'?'GLOBAL':currentSheet}_${new Date().toISOString().slice(0,10)}.pdf`;try{if(window.claude&&window.claude.use){const dl=await window.claude.use('downloads');if(dl){await dl.save({filename,data:doc.output('blob')});return}}}catch(e){console.warn('Téléchargement indisponible',e)}doc.save(filename)}
 async function exportAllSheets(){if(READ_ONLY)return;
  const names=sheetNames();
  if(!names.length){showToast('Aucune donnée à exporter');return}
@@ -717,9 +720,77 @@ function importToCloud(){
  applyFieldEdits();
 }
 
+/* ===== Page « Tous les suivis » : tous les suivis au même endroit, sans ouvrir chaque fiche ===== */
+let suiviFilter={q:'',status:'',sheet:'',order:'recent'};
+let suiviView=[];
+function parseTrackKey(k){const a=k.indexOf('::'),b=k.lastIndexOf('::');return {sheet:k.slice(0,a),name:k.slice(a+2,b),tel:k.slice(b+2)}}
+function allSuivis(){
+ const out=[];
+ Object.keys(trackData).forEach(key=>{
+   const p=parseTrackKey(key);
+   (trackData[key]||[]).forEach(e=>out.push({key:key,sheet:p.sheet,name:p.name,tel:p.tel,e:e}));
+ });
+ return out.sort((a,b)=>(b.e.ts||0)-(a.e.ts||0));
+}
+function updateSuivisBadge(){
+ const b=document.querySelector('#sheetNav button[data-sheet="__SUIVIS__"]');
+ if(b)b.textContent='📋 Tous les suivis ('+allSuivis().length+')';
+}
+function suiviEtat(s){
+ if(s.sheet==='RECAP')return '';
+ const rows=data[s.sheet];if(!rows)return '';
+ const tc=telCol(s.sheet);
+ const r=rows.find(x=>String(x[0]??'').trim()===s.name&&String(x[tc]??'').trim()===s.tel)||rows.find(x=>String(x[0]??'').trim()===s.name);
+ return r?String(r[STATUS_COL]??'').trim():'';
+}
+function fmtDay(v){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(v||'');return m?m[3]+'/'+m[2]+'/'+m[1]:(v||'')}
+function suiviClass(v){const n=normalize(v);return n==='RESOLU'?'ok':n==='EN COURS'?'warn':n==='BLOQUE'?'danger':'neutral'}
+function renderSuivis(){
+ const list=allSuivis();
+ const sheets=[...new Set(list.map(s=>s.sheet))].sort();
+ const statuses=[...new Set(['En attente','En cours','Résolu','Bloqué','Autre'].concat(list.map(s=>s.e.status).filter(Boolean)))];
+ if(suiviFilter.sheet&&!sheets.includes(suiviFilter.sheet))suiviFilter.sheet='';
+ const box=document.getElementById('filters');
+ box.innerHTML='<input id="sv_q" placeholder="Rechercher (nom, notes, contact…)" value="'+esc(suiviFilter.q)+'">'
+  +'<select id="sv_status"><option value="">Tous les statuts</option>'+statuses.map(s=>'<option value="'+esc(s)+'"'+(s===suiviFilter.status?' selected':'')+'>'+esc(s)+'</option>').join('')+'</select>'
+  +'<select id="sv_sheet"><option value="">Toutes les feuilles</option>'+sheets.map(s=>'<option value="'+esc(s)+'"'+(s===suiviFilter.sheet?' selected':'')+'>'+esc(s)+'</option>').join('')+'</select>'
+  +'<select id="sv_order"><option value="recent">Plus récents d\'abord</option><option value="old"'+(suiviFilter.order==='old'?' selected':'')+'>Plus anciens d\'abord</option><option value="name"'+(suiviFilter.order==='name'?' selected':'')+'>Nom A → Z</option></select>';
+ const upd=()=>{suiviFilter.q=document.getElementById('sv_q').value;suiviFilter.status=document.getElementById('sv_status').value;suiviFilter.sheet=document.getElementById('sv_sheet').value;suiviFilter.order=document.getElementById('sv_order').value;renderSuivisTable()};
+ ['sv_q','sv_status','sv_sheet','sv_order'].forEach(id=>{const el=document.getElementById(id);el.oninput=upd;el.onchange=upd});
+ renderSuivisTable();
+}
+function renderSuivisTable(){
+ const f=suiviFilter,q=normalize(f.q);
+ const all=allSuivis();
+ let list=all.filter(s=>(!f.sheet||s.sheet===f.sheet)&&(!f.status||s.e.status===f.status)&&(!q||normalize([s.name,s.sheet,s.tel,s.e.contact,s.e.notes,s.e.other,s.e.status].join(' ')).includes(q)));
+ if(f.order==='old')list=list.slice().reverse();
+ else if(f.order==='name')list=list.slice().sort((a,b)=>normalize(a.name).localeCompare(normalize(b.name))||(b.e.ts||0)-(a.e.ts||0));
+ suiviView=list;
+ document.getElementById('rowCount').textContent=list.length+' suivi(s) · '+new Set(list.map(s=>s.key)).size+' personne(s)';
+ const box=document.getElementById('tableBox');
+ if(!list.length){box.innerHTML='<div class="notice">'+(all.length?'Aucun suivi ne correspond à la recherche.':'Aucun suivi enregistré pour le moment. Ouvrez « 📝 Suivi » sur une personne pour en ajouter un.')+'</div>';return}
+ const dates=e=>[['Info',e.infoDate],['Demande',e.demandeDate],['Relance',e.relanceDate],['Résolution',e.resolutionDate]].filter(x=>x[1]).map(x=>'<div><b>'+x[0]+' :</b> '+esc(fmtDay(x[1]))+'</div>').join('');
+ box.innerHTML='<div class="table-wrap"><table><thead><tr><th>Saisi le</th><th>Nom</th><th>Feuille</th><th>État actuel</th><th>Statut du suivi</th><th>Contact</th><th>Dates</th><th>Notes</th><th>Autre</th></tr></thead><tbody>'
+  +list.map((s,i)=>{const e=s.e,et=suiviEtat(s);return '<tr class="sv-row" data-i="'+i+'"><td>'+esc(e.ts?new Date(e.ts).toLocaleString('fr-FR'):'')+'</td><td><b>'+esc(s.name)+'</b></td><td>'+esc(s.sheet)+'</td><td>'+(et?'<span class="badge '+statusClass(et)+'">'+esc(et)+'</span>':'')+'</td><td>'+(e.status?'<span class="badge '+suiviClass(e.status)+'">'+esc(e.status)+'</span>':'')+'</td><td>'+esc(e.contact||'')+'</td><td>'+dates(e)+'</td><td class="sv-notes">'+esc(e.notes||'')+'</td><td class="sv-notes">'+esc(e.other||'')+'</td></tr>'}).join('')
+  +'</tbody></table></div>';
+ box.querySelectorAll('tr.sv-row').forEach(tr=>tr.onclick=()=>{const s=suiviView[+tr.dataset.i];if(s)openTrackModal(s.key,s.name)});
+}
+async function exportSuivisExcel(){
+ if(READ_ONLY)return;
+ if(!suiviView.length){showToast('Aucun suivi à exporter');return}
+ const head=['Saisi le','Nom','Feuille','Téléphone','État actuel','Statut du suivi','Contact','Date d\'information','Date de demande de réinitialisation','Date de relance','Date de résolution','Notes','Autre'];
+ const rows=suiviView.map(s=>{const e=s.e;return [e.ts?new Date(e.ts).toLocaleString('fr-FR'):'',s.name,s.sheet,s.tel,suiviEtat(s),e.status||'',e.contact||'',fmtDay(e.infoDate),fmtDay(e.demandeDate),fmtDay(e.relanceDate),fmtDay(e.resolutionDate),e.notes||'',e.other||'']});
+ const ws=XLSX.utils.aoa_to_sheet([head,...rows]),wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,ws,'SUIVIS');
+ const filename='ACCESS_HUB_SUIVIS_'+new Date().toISOString().slice(0,10)+'.xlsx';
+ try{if(window.claude&&window.claude.use){const dl=await window.claude.use('downloads');if(dl){await dl.save({filename,data:XLSX.write(wb,{bookType:'xlsx',type:'array'})});showToast('Export des suivis généré ✓');return}}}catch(err){console.warn('Téléchargement indisponible',err)}
+ XLSX.writeFile(wb,filename);
+ showToast('Export des suivis généré ✓');
+}
+
 function clearFilters(){document.getElementById('search').value='';if(document.getElementById('accessFilter'))document.getElementById('accessFilter').value='';buildFilters();renderTable()}
 const LS_NAV_KEY='ACCESS_HUB_NAV_COLLAPSED_V1';
-function updateNavCurrent(n){const el=document.getElementById('navCurrent');if(el)el.textContent=(n==='__ALL__'||n==null)?'Tableau de bord':n}
+function updateNavCurrent(n){const el=document.getElementById('navCurrent');if(el)el.textContent=(n==='__ALL__'||n==null)?'Tableau de bord':(n==='__SUIVIS__'?'Tous les suivis':n)}
 function setNavCollapsed(collapsed,persist=true){
  nav.classList.toggle('collapsed',collapsed);
  const t=document.getElementById('navToggle');
